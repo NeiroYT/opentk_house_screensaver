@@ -218,19 +218,22 @@ namespace My_First_OPENGL_application
         private Matrix4 lightSpaceMatrix;
         private Vector2 mouseLastPos;
         private Vector3[] cameraPos;
+        private Vector3[] grass1info;
         private Vector3 viewVector;
         private Vector3 lampPos;
         private Vector4 lampColor;
         private ModelTest modeltest1;
+        private ModelTest lamp1;
+        private ModelTest moon1;
+        private ModelTest grass1;
         private Object house;
-        private Object lamp;
-        private Object moon;
         private Object earth;
         private int CUR_CAMERA;
         private float curColor;
         private float ambientColor;
         private bool isNight;
         private bool mouseFirstMove;
+        private const int grassCount = 8192;
         private const float cameraSpeed = 1.5f;
         private const float sensitivity = 0.2f;
         private const float specular_all = 0.5f;
@@ -251,6 +254,7 @@ namespace My_First_OPENGL_application
             this.CenterWindow();
             // init essential values
             cameraPos = new Vector3[2];
+            grass1info = new Vector3[grassCount];
             cameraPos[0] = new Vector3(0, 1, 2);
             cameraPos[1] = new Vector3(0, 0.3f, 2);
             if (POINT_LIGHT)
@@ -274,6 +278,15 @@ namespace My_First_OPENGL_application
 
         protected override void OnLoad()
         {
+            Random rand = new Random(DateTime.UtcNow.Millisecond);
+            double range0 = -20;
+            double range1 = 20;
+            for (int i = 0; i < grassCount; i++)
+            {
+                grass1info[i].X = (float)(rand.NextDouble() * (range1 - range0) - (range1 - range0) / 2);
+                grass1info[i].Y = (float)(rand.NextDouble() * (range1 - range0) - (range1 - range0) / 2);
+                grass1info[i].Z = (float)(rand.NextDouble() * 360);
+            }
             this.CursorState = CursorState.Grabbed;
             this.IsVisible = true;
             GL.ClearColor(0.0f, curColor, curColor, 1.0f);
@@ -424,15 +437,19 @@ namespace My_First_OPENGL_application
                 house = new Object(vertices1, houseVertexShaderPath, houseFragmentShaderPointPath, attr_size1);
                 earth = new Object(vertices3, groundVertexShaderPath, groundFragmentShaderPointPath, attr_size3);
                 modeltest1 = new ModelTest("../../../Objects/GraceField_House.obj", house1VertexShaderPath, house1FragmentShaderPointPath);
+                grass1 = new ModelTest("../../../Objects/highqualitygrass.obj", house1VertexShaderPath, house1FragmentShaderPointPath);
             }
             else
             {
                 house = new Object(vertices1, houseVertexShaderPath, houseFragmentShaderDirPath, attr_size1);
                 earth = new Object(vertices3, groundVertexShaderPath, groundFragmentShaderDirPath, attr_size3);
                 modeltest1 = new ModelTest("../../../Objects/GraceField_House.obj", house1VertexShaderPath, house1FragmentShaderDirPath);
+                grass1 = new ModelTest("../../../Objects/highqualitygrass.obj", house1VertexShaderPath, house1FragmentShaderDirPath);
             }
-            lamp = new Object(vertices2, lightVertexShaderPath, lightFragmentShaderPath, attr_size2);
-            moon = new Object(vertices2, lightVertexShaderPath, lightFragmentShaderPath, attr_size2);
+            //lamp = new Object(vertices2, lightVertexShaderPath, lightFragmentShaderPath, attr_size2);
+            lamp1 = new ModelTest("../../../Objects/sun.obj", lightVertexShaderPath, lightFragmentShaderPath);
+            //moon = new Object(vertices2, lightVertexShaderPath, lightFragmentShaderPath, attr_size2);
+            moon1 = new ModelTest("../../../Objects/sun.obj", lightVertexShaderPath, lightFragmentShaderPath);
             earth.setTexture("../../../Objects/grass.png", TextureUnit.Texture0);
             shadow = new Shadow();
             shadowShader = new Shader("../../../Shaders/shadow_simple_shader.vert", "../../../Shaders/shadow_simple_shader.frag");
@@ -500,9 +517,9 @@ namespace My_First_OPENGL_application
 
         private void RenderObjects(Shader shader = null)
         {
-            Matrix4 lampModel = Matrix4.CreateScale(POINT_LIGHT ? 1f : 4.5f);
+            Matrix4 lampModel = Matrix4.CreateScale(POINT_LIGHT ? 256f : 1152f);
             lampModel *= Matrix4.CreateTranslation(isNight ? -lampPos : lampPos);
-            Matrix4 moonModel = Matrix4.CreateScale(POINT_LIGHT ? 1f : 4.5f);
+            Matrix4 moonModel = Matrix4.CreateScale(POINT_LIGHT ? 256f : 1152f);
             moonModel *= Matrix4.CreateTranslation(isNight ? lampPos : -lampPos);
             Matrix4 view;
             if (CUR_CAMERA == 1)
@@ -515,8 +532,16 @@ namespace My_First_OPENGL_application
             }
             Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), (float)ClientSize.X / ClientSize.Y, 0.1f, 100.0f);
             // our houses
-            RenderHouses(ref view, ref projection, shader);
+            //RenderHouses(ref view, ref projection, shader);
             // model from file
+            if (shader != null)
+            {
+                shader.Use();
+            }
+            else
+            {
+                modeltest1.shader.Use();
+            }
             foreach (Mesh mesh in modeltest1.model.meshes)
             {
                 modeltest1.shader.SetMatrix4("model", Matrix4.CreateScale(32.0f));
@@ -539,51 +564,79 @@ namespace My_First_OPENGL_application
                 }
                 //modeltest1.texture.Use(TextureUnit.Texture0);
                 //modeltest1.shader.SetInt("texture0", 0);
-                if (shader == null)
+                modeltest1.Render(ref shader, mesh);
+            }
+            grass1.shader.SetMatrix4("view", view);
+            grass1.shader.SetMatrix4("projection", projection);
+            grass1.shader.SetVector3("light.color", lampColor.Xyz);
+            grass1.shader.SetVector3("viewPos", cameraPos[CUR_CAMERA]);
+            grass1.shader.SetMatrix4("lightSpaceMatrix", lightSpaceMatrix);
+            grass1.shader.SetFloat("light.ambient", curColor);
+            grass1.shader.SetFloat("light.diffuse", curColor / ambientColor);
+            grass1.shader.SetFloat("light.specular", specular_all);
+            grass1.shader.SetInt("shadowMap", 1);
+            if (POINT_LIGHT)
+            {
+                grass1.shader.SetVector3("light.pos", lampPos);
+            }
+            else
+            {
+                grass1.shader.SetVector3("light.direction", -lampPos);
+            }
+            Matrix4 curGrassModel;
+            if (shader != null)
+            {
+                shader.Use();
+            }
+            else
+            {
+                grass1.shader.Use();
+            }
+            for (int i = 0; i < grassCount; i++)
+            {
+                curGrassModel = Matrix4.CreateRotationY(grass1info[i].Z) * Matrix4.CreateScale(256.0f) * Matrix4.CreateTranslation(grass1info[i].X, 0.0f, grass1info[i].Y);
+                foreach (Mesh mesh in grass1.model.meshes)
                 {
-                    modeltest1.shader.Use();
+                    grass1.shader.SetMatrix4("model", curGrassModel);
+                    grass1.Render(ref shader, mesh);
+                }
+            }
+            // light source (sun)
+            foreach (Mesh mesh in lamp1.model.meshes) {
+                if (POINT_LIGHT)
+                {
+                    lamp1.shader.SetMatrix4("model", lampModel);
                 }
                 else
                 {
-                    float[] temp = new float[16];
-                    GL.GetUniform(modeltest1.shader.Handle, GL.GetUniformLocation(modeltest1.shader.Handle, "model"), temp);
-                    shader.SetMatrix4("model", temp);
-                    shader.Use();
+                    lamp1.shader.SetMatrix4("model", lampModel * Matrix4.CreateTranslation(cameraPos[CUR_CAMERA]));
                 }
-                GL.BindVertexArray(mesh.VAO);
-                GL.DrawElements(PrimitiveType.Triangles, mesh.indicesCount, DrawElementsType.UnsignedInt, 0);
-            }
-            // light source (sun)
-            if (POINT_LIGHT)
-            {
-                lamp.objShader.SetMatrix4("model", lampModel);
-            }
-            else
-            {
-                lamp.objShader.SetMatrix4("model", lampModel * Matrix4.CreateTranslation(cameraPos[CUR_CAMERA]));
-            }
-            lamp.objShader.SetMatrix4("view", view);
-            lamp.objShader.SetMatrix4("projection", projection);
-            lamp.objShader.SetVector4("lightColor", lampColor);
-            if (shader == null)
-            {
-                lamp.Render();
+                lamp1.shader.SetMatrix4("view", view);
+                lamp1.shader.SetMatrix4("projection", projection);
+                lamp1.shader.SetVector4("lightColor", lampColor);
+                if (shader == null)
+                {
+                    lamp1.Render(mesh);
+                }
             }
             // light source (moon)
-            if (POINT_LIGHT)
+            foreach (Mesh mesh in lamp1.model.meshes)
             {
-                moon.objShader.SetMatrix4("model", moonModel);
-            }
-            else
-            {
-                moon.objShader.SetMatrix4("model", moonModel * Matrix4.CreateTranslation(cameraPos[CUR_CAMERA]));
-            }
-            moon.objShader.SetMatrix4("view", view);
-            moon.objShader.SetMatrix4("projection", projection);
-            moon.objShader.SetVector4("lightColor", lampColor);
-            if (shader == null)
-            {
-                moon.Render();
+                if (POINT_LIGHT)
+                {
+                    moon1.shader.SetMatrix4("model", moonModel);
+                }
+                else
+                {
+                    moon1.shader.SetMatrix4("model", moonModel * Matrix4.CreateTranslation(cameraPos[CUR_CAMERA]));
+                }
+                moon1.shader.SetMatrix4("view", view);
+                moon1.shader.SetMatrix4("projection", projection);
+                moon1.shader.SetVector4("lightColor", lampColor);
+                if (shader == null)
+                {
+                    moon1.Render(mesh);
+                }
             }
             // grass
             earth.objShader.SetMatrix4("model", Matrix4.CreateScale(256.0f) * Matrix4.CreateTranslation(0.0f, -1e-4f, 0.0f));
@@ -593,7 +646,7 @@ namespace My_First_OPENGL_application
             earth.objShader.SetVector3("light.color", lampColor.Xyz);
             earth.objShader.SetMatrix4("lightSpaceMatrix", lightSpaceMatrix);
             earth.objShader.SetInt("shadowMap", 1);
-            earth.objShader.SetFloat("light.ambient", curColor + 0.2f);
+            earth.objShader.SetFloat("light.ambient", curColor);
             earth.objShader.SetFloat("light.diffuse", curColor / ambientColor);
             earth.objShader.SetFloat("light.specular", 0.0f);
             earth.objShader.SetInt("texture0", 0);
@@ -612,28 +665,28 @@ namespace My_First_OPENGL_application
         {
             float k = 25.0f;
             Matrix4 houseModel = Matrix4.CreateTranslation(-k, 0.5f, -k);
+            house.objShader.SetMatrix4("view", view);
+            house.objShader.SetMatrix4("projection", projection);
+            house.objShader.SetVector3("viewPos", cameraPos[CUR_CAMERA]);
+            house.objShader.SetVector3("light.color", lampColor.Xyz);
+            house.objShader.SetMatrix4("lightSpaceMatrix", lightSpaceMatrix);
+            house.objShader.SetInt("shadowMap", 1);
+            house.objShader.SetFloat("light.ambient", curColor + 0.1f);
+            house.objShader.SetFloat("light.diffuse", curColor / ambientColor);
+            house.objShader.SetFloat("light.specular", specular_all);
+            if (POINT_LIGHT)
+            {
+                house.objShader.SetVector3("light.pos", lampPos);
+            }
+            else
+            {
+                house.objShader.SetVector3("light.direction", -lampPos);
+            }
             for (int j = 0; j < k; j++)
             {
                 for (int i = 0; i < k; i++)
                 {
                     house.objShader.SetMatrix4("model", houseModel);
-                    house.objShader.SetMatrix4("view", view);
-                    house.objShader.SetMatrix4("projection", projection);
-                    house.objShader.SetVector3("viewPos", cameraPos[CUR_CAMERA]);
-                    house.objShader.SetVector3("light.color", lampColor.Xyz);
-                    house.objShader.SetMatrix4("lightSpaceMatrix", lightSpaceMatrix);
-                    house.objShader.SetInt("shadowMap", 1);
-                    house.objShader.SetFloat("light.ambient", curColor + 0.1f);
-                    house.objShader.SetFloat("light.diffuse", curColor / ambientColor);
-                    house.objShader.SetFloat("light.specular", specular_all);
-                    if (POINT_LIGHT)
-                    {
-                        house.objShader.SetVector3("light.pos", lampPos);
-                    }
-                    else
-                    {
-                        house.objShader.SetVector3("light.direction", -lampPos);
-                    }
                     house.Render(ref shader);
                     houseModel *= Matrix4.CreateTranslation(5.0f, 0.0f, 0.0f);
                 }
