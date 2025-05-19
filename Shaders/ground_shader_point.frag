@@ -1,7 +1,7 @@
 #version 330 core
 
 struct Light {
-	vec3 direction;
+	vec3 pos;
 	vec3 color;
 	float ambient;
 	float diffuse;
@@ -36,7 +36,7 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     float currentDepth = projCoords.z;
     // calculate bias (based on depth map resolution and slope)
     vec3 normal = normalize(Normal);
-    vec3 lightDir = normalize(-light.direction);
+    vec3 lightDir = normalize(light.pos - FragPos);
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
 	//float bias = 0.0;
     // check whether current frag pos is in shadow
@@ -61,9 +61,9 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     return shadow;
 }
 
-vec3 CalcDirLight(Light light, vec3 normal)
+vec3 CalcPointLight(Light light, vec3 normal)
 {
-	vec3 lightDir = normalize(-light.direction);
+	vec3 lightDir = normalize(light.pos - FragPos);
 	float diff = max(dot(normal, lightDir), 0.0);
 	vec3 viewDir = normalize(viewPos - FragPos);
 	vec3 reflectDir = reflect(-lightDir, normal);
@@ -72,10 +72,13 @@ vec3 CalcDirLight(Light light, vec3 normal)
 	vec3 diffuse  = light.diffuse  * diff * light.color;
 	vec3 specular = light.specular * spec * light.color;
 	float shadow = ShadowCalculation(FragPosLightSpace);
-	return (ambient + (1.0 - shadow) * (diffuse + specular));
+	// ATTENUATION
+	float distance = length(light.pos - FragPos);
+	float attenuation = 1.0 / (1.0f + 0.09f * distance + 0.032f * (distance * distance));
+	return (ambient + (1.0 - shadow) * (diffuse + specular)) * attenuation;
 }
 
 void main() {
-	vec3 result = CalcDirLight(light, normalize(Normal)) * vec3(texture(texture0, TexCoords));
+	vec3 result = CalcPointLight(light, normalize(Normal)) * vec3(texture(texture0, TexCoords));
 	resColor = vec4(result, 1.0);
 }

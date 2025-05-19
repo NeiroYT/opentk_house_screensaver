@@ -174,6 +174,11 @@ namespace Externals
             GL.UseProgram(Handle);
             GL.UniformMatrix4(_uniformLocations[name], false, ref data);
         }
+        public void SetMatrix4(string name, float[] data)
+        {
+            GL.UseProgram(Handle);
+            GL.UniformMatrix4(_uniformLocations[name], 1, false, data);
+        }
 
         /// <summary>
         /// Set a uniform Vector3 on this shader.

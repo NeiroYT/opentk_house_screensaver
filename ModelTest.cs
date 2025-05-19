@@ -17,11 +17,11 @@ namespace My_First_OPENGL_application
         public Model model;
         public Shader shader;
         public Texture texture;
-        public ModelTest()
+        public ModelTest(string pathToObj, string pathToVert, string pathToFrag, string pathToTexture = "../../../Objects/container.png")
         {
-            model = new Model("../../../Objects/GraceField_House.obj");
-            shader = new Shader("../../../Shaders/model_shader.vert", "../../../Shaders/house_shader_direct1.frag");
-            texture = Texture.LoadFromFile("../../../Objects/container.png");
+            model = new Model(pathToObj);
+            shader = new Shader(pathToVert, pathToFrag);
+            texture = Texture.LoadFromFile(pathToTexture);
         }
     }
 }
